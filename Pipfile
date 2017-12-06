@@ -9,7 +9,6 @@ name = "pypi"
 
 click = "*"
 daiquiri = "*"
-pyunpack = "*"
 patool = "*"
 
 

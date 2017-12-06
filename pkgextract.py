@@ -6,14 +6,12 @@ import json
 import logging
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
 
 import click
 import daiquiri
-import pyunpack
 
 _LOGGER = daiquiri.getLogger(__name__)
 
@@ -25,10 +23,6 @@ _MERCATOR_HANDLERS_YAML = os.getenv('MERCATOR_HANDLERS_YAML',
                                     os.path.join(_SELF_PATH, _BIN_PATH, 'handlers.yml'))
 _CONTAINER_DIFF_BIN = os.getenv('CONTAINER_DIFF_BIN',
                                 os.path.join(_SELF_PATH, _BIN_PATH, 'container-diff'))
-
-
-class InputError(Exception):
-    """Raised on invalid user input."""
 
 
 def jsonify(dict_):
@@ -43,23 +37,29 @@ def jsonify(dict_):
 
 
 @contextlib.contextmanager
-def tempdir():
-    """Create a temporary file, delete it on leaving context."""
+def mount_image(image_name):
+    """Mount a Docker image to a local filesystem."""
     dirpath = tempfile.mkdtemp()
     try:
+        _LOGGER.debug("Mounting image %r to %r", image_name, dirpath)
+        _run_command('atomic mount {image_name} {dirpath}'.format(
+            image_name=image_name,
+            dirpath=dirpath
+        ))
         yield dirpath
     finally:
-        if os.path.isdir(dirpath):
-            _LOGGER.debug("Removing a temporary directory %r", dirpath)
-            shutil.rmtree(dirpath)
+        _LOGGER.debug("Unmounting image %r from %r", image_name, dirpath)
+        _run_command('atomic umount {dirpath}'.format(dirpath=dirpath))
 
 
-def _run_command(cmd):
+def _run_command(cmd, env=None):
     """Run the given command and return its stdout.
 
     :param cmd: a string containing command that should be run
     :type cmd: str
-    :rtype: str
+    :param env: additional environment variables that should be supplied
+    :type env: dict
+    :type: str
     :return: stdout produced by the command
     :raises RuntimeError: signalizing process exited with non-zero value
     """
@@ -68,7 +68,8 @@ def _run_command(cmd):
         output = subprocess.check_output(
             shlex.split(cmd),
             stderr=subprocess.PIPE,
-            universal_newlines=True
+            universal_newlines=True,
+            env=env
         )
     except subprocess.CalledProcessError as exc:
         _LOGGER.error(exc.stderr.replace('\\n', '\n'))
@@ -77,33 +78,23 @@ def _run_command(cmd):
     return output
 
 
-def _docker_save_image(image_name):
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tar').name
-    _LOGGER.debug("Saving docker image %r to an archive %r", image_name, temp_file)
-
-    cmd = 'docker save {image_name} --output {temp_file}'.format(
-        image_name=image_name,
-        temp_file=temp_file
-    )
-    try:
-        _run_command(cmd)
-    except Exception:
-        os.remove(temp_file)
-        raise
-
-    return temp_file
-
-
 def _filter_container_diff_output(output):
     """Normalize and filter container-diff output."""
     result = []
     for entry in output[0].get('Analysis', []):
-        result.append({'name': entry['Name'], 'version': entry['Version']})
+        result.append({
+            'name': entry['Name'],
+            'version': entry['Version']
+        })
     return result
 
 
 def _filter_mercator_output(output):
-    return output
+    """Normalize and filter mercator output."""
+    for entry in output.get('items', []):
+        entry.pop('digests', None)
+        entry.pop('time', None)
+    return output.get('items', [])
 
 
 def _run_container_diff_rpm(image_name, local=True):
@@ -122,7 +113,7 @@ def _run_container_diff_rpm(image_name, local=True):
         image=image
     )
     output = _run_command(cmd)
-    return _filter_container_diff_output(json.loads(output))
+    return json.loads(output)
 
 
 def _run_mercator_pypi(path):
@@ -138,50 +129,28 @@ def _run_mercator_pypi(path):
         mercator_handlers_yaml=_MERCATOR_HANDLERS_YAML,
         path=path
     )
-    output = _run_command(cmd)
-    return json.loads(_filter_mercator_output(output))
+    output = _run_command(cmd, env={'MERCATOR_INTERPRET_SETUP_PY': 'true'})
+    return json.loads(output)
 
 
-def analyze(image_name=None, archive_path=None):
+def analyze(image_name):
     """Search for installed PyPI and RPM packages inside a Docker image.
 
     :param image_name: name if the image to be analyzed (disjoint with archive_path)
     :type image_name: str
-    :param archive_path: a path to stored archive (disjoint with image_name)
-    :type archive_path: str
     :return: information about installed packages in the image
     :rtype: dict
     """
-    if not image_name and not archive_path:
-        raise InputError("Please specify archive path or image name that should be analyzed.")
+    rpm_packages = _filter_container_diff_output(_run_container_diff_rpm(image_name))
 
-    if image_name and archive_path:
-        raise InputError("Options --archive-path and --image-name are disjoint")
+    with mount_image(image_name) as path:
+        pypi_packages = _filter_mercator_output(_run_mercator_pypi(path))
 
-    result = {
-        'rpm': None,
-        'pypi': None,
+    return {
+        'rpm': rpm_packages,
+        'pypi': pypi_packages,
         'image_name': image_name
     }
-
-    try:
-        if image_name:
-            archive_path = _docker_save_image(image_name)
-            result['rpm'] = _run_container_diff_rpm(image_name)
-        else:
-            _LOGGER.warning("Collecting RPM packages on a local image archive not yet supported")
-
-        with tempdir() as path:
-            pyunpack.Archive(archive_path, backend='auto').extractall(path)
-            result['pypi'] = _run_mercator_pypi(path)
-
-    finally:
-        if image_name:
-            # There was specified an image name, clean a temporary archive.
-            _LOGGER.debug("Cleaning temporary archive path %r", archive_path)
-            os.remove(archive_path)
-
-    return result
 
 
 @click.group()
@@ -197,14 +166,12 @@ def cli(verbose=0):
 @cli.command('analyze')
 @click.option('-i', '--image-name',
               help='Image name to be analyzed (disjoint with --archive-path).')
-@click.option('-a', '--archive-path',
-              help='Tar archive to be analyzed (disjoint with --image-name).')
 @click.option('-o', '--output-file', type=click.File('w'),
               help='Store results in specified output file (defaults to stdout).')
-def cli_analyze(image_name=None, archive_path=None, output_file=None):
+def cli_analyze(image_name=None, output_file=None):
     """Search for installed PyPI and RPM packages inside a Docker image."""
     output_file = output_file or sys.stdout
-    result = analyze(image_name=image_name, archive_path=archive_path)
+    result = analyze(image_name)
     output_file.write(jsonify(result))
 
 
