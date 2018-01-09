@@ -10,19 +10,13 @@ import subprocess
 import sys
 import tempfile
 
-import click
 import daiquiri
 
 _LOGGER = daiquiri.getLogger(__name__)
 
-_SELF_PATH = os.path.dirname(os.path.realpath(__file__))
-_BIN_PATH = os.getenv('BINPATH', os.path.join(_SELF_PATH, 'bin'))
-_MERCATOR_BIN = os.getenv('MERCATOR_BIN',
-                          os.path.join(_SELF_PATH, _BIN_PATH, 'mercator'))
-_MERCATOR_HANDLERS_YAML = os.getenv('MERCATOR_HANDLERS_YAML',
-                                    os.path.join(_SELF_PATH, _BIN_PATH, 'handlers.yml'))
-_CONTAINER_DIFF_BIN = os.getenv('CONTAINER_DIFF_BIN',
-                                os.path.join(_SELF_PATH, _BIN_PATH, 'container-diff'))
+_MERCATOR_BIN = os.getenv('MERCATOR_BIN', 'mercator')
+_MERCATOR_HANDLERS_YAML = os.getenv('MERCATOR_HANDLERS_YAML', '/usr/share/mercator')
+_CONTAINER_DIFF_BIN = os.getenv('CONTAINER_DIFF_BIN', 'container-diff')
 
 
 def jsonify(dict_):
@@ -72,7 +66,7 @@ def _run_command(cmd, env=None):
             env=env
         )
     except subprocess.CalledProcessError as exc:
-        _LOGGER.error(exc.stderr.replace('\\n', '\n'))
+        _LOGGER.error(exc.output.replace('\\n', '\n'))
         err_msg = "Failed to run command %r" % cmd
         raise RuntimeError(err_msg) from exc
     return output
@@ -152,28 +146,3 @@ def analyze(image_name):
         'image_name': image_name
     }
 
-
-@click.group()
-@click.option('-v', '--verbose', count=True,
-              help='Level of verbosity, can be applied multiple times.')
-def cli(verbose=0):
-    """Package extraction from a Docker image."""
-    # hack based on num values of logging.DEBUG, logging.INFO, ...
-    level = max(logging.WARNING - verbose * 10, logging.DEBUG)
-    daiquiri.setup(outputs=(daiquiri.output.STDERR,), level=level)
-
-
-@cli.command('analyze')
-@click.option('-i', '--image-name', required=True,
-              help='Image name to be analyzed.')
-@click.option('-o', '--output-file', type=click.File('w'),
-              help='Store results in specified output file (defaults to stdout).')
-def cli_analyze(image_name=None, output_file=None):
-    """Search for installed PyPI and RPM packages inside a Docker image."""
-    output_file = output_file or sys.stdout
-    result = analyze(image_name)
-    output_file.write(jsonify(result))
-
-
-if __name__ == '__main__':
-    sys.exit(cli())
