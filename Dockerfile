@@ -1,12 +1,14 @@
-FROM fedora:27
+FROM centos:7
 
 ENV LANG=en_US.UTF-8 \
     PKGEXTRACTOR_TMP_DIR='/tmp/pkgextractor' \
     GOPATH='/tmp/go'
 ENTRYPOINT ["pkgextract"]
 
-RUN dnf update -y &&\
-  dnf install -y python3-pip python-pip findutils go git make docker # findutils needed for xargs
+RUN yum install -y epel-release &&\
+  yum update -y &&\
+  yum install -y python34-pip python-pip findutils go git make docker &&\
+  yum clean all
 
 # Install pkgextract itself
 RUN mkdir -p ${PKGEXTRACTOR_TMP_DIR}

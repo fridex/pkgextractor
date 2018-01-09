@@ -66,7 +66,7 @@ def _run_command(cmd, env=None):
             env=env
         )
     except subprocess.CalledProcessError as exc:
-        _LOGGER.error(exc.stderr.replace('\\n', '\n'))
+        _LOGGER.error(exc.output.replace('\\n', '\n'))
         err_msg = "Failed to run command %r" % cmd
         raise RuntimeError(err_msg) from exc
     return output
