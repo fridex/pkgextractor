@@ -164,7 +164,7 @@ def cli(verbose=0):
 
 
 @cli.command('analyze')
-@click.option('-i', '--image-name',
+@click.option('-i', '--image-name', required=True,
               help='Image name to be analyzed.')
 @click.option('-o', '--output-file', type=click.File('w'),
               help='Store results in specified output file (defaults to stdout).')
