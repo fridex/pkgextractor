@@ -165,7 +165,7 @@ def cli(verbose=0):
 
 @cli.command('analyze')
 @click.option('-i', '--image-name',
-              help='Image name to be analyzed (disjoint with --archive-path).')
+              help='Image name to be analyzed.')
 @click.option('-o', '--output-file', type=click.File('w'),
               help='Store results in specified output file (defaults to stdout).')
 def cli_analyze(image_name=None, output_file=None):
