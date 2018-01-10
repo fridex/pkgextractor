@@ -36,7 +36,7 @@ mercator-go: $(BINPATH)
 		git clone https://github.com/fabric8-analytics/mercator-go $(MERCATOR_GO_PATH)
 	cd $(MERCATOR_GO_PATH) &&\
 	  go get &&\
-	  make DOTNET=NO RUST=NO JAVA=NO HASKELL=NO build &&\
+	  make RUBY=NO NPM=NO PYTHON=YES JAVA=NO GRADLE=NO DOTNET=NO RUST=NO HASKELL=NO GOLANG=NO build &&\
 	  make install &&\
 	  cd $(PWD)
 
