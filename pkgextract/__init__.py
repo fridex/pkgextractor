@@ -48,18 +48,25 @@ def _run_command(cmd, env=None):
     :return: stdout produced by the command
     :raises RuntimeError: signalizing process exited with non-zero value
     """
-    _LOGGER.debug("Running command %r", cmd)
-    try:
-        output = subprocess.check_output(
-            shlex.split(cmd),
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            env=env
-        )
-    except subprocess.CalledProcessError as exc:
-        _LOGGER.error(exc.output.replace('\\n', '\n'))
-        err_msg = "Failed to run command %r" % cmd
-        raise RuntimeError(err_msg) from exc
+    _LOGGER.debug("Running command %r%s", cmd, " environment: {}".format(env) if env else "")
+    args = shlex.split(cmd)
+    environment = dict(os.environ).update(**(env or {}))
+
+    process = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=environment
+    )
+    output, errs = process.communicate()
+
+    if errs:
+        _LOGGER.warning("%s: %s", args[0], errs)
+
+    if process.returncode != 0:
+        raise RuntimeError("Command %s exited with non-zero exit value (called as: %r)" % (args[0], args))
+
     return output
 
 
@@ -77,7 +84,6 @@ def _filter_container_diff_output(output):
 def _filter_mercator_output(output):
     """Normalize and filter mercator output."""
     for entry in output.get('items', []):
-        entry.pop('digests', None)
         entry.pop('time', None)
     return output.get('items', [])
 
