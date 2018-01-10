@@ -6,7 +6,7 @@ ENV LANG=en_US.UTF-8 \
 ENTRYPOINT ["pkgextract"]
 
 RUN dnf update -y &&\
-  dnf install -y python3-pip python-pip findutils atomic go gcc-go git make docker # findutils needed for xargs
+  dnf install -y python3 python3-pip python-pip findutils atomic go gcc-go git make docker # findutils needed for xargs
 
 # Install pkgextract itself
 RUN mkdir -p ${PKGEXTRACTOR_TMP_DIR}
