@@ -32,8 +32,9 @@ def mount_image(image_name):
         _LOGGER.debug("Unmounting image %r from %r", image_name, dirpath)
         try:
             _run_command('atomic umount {dirpath}'.format(dirpath=dirpath))
-        except Exception as exc:
+        except:
             _LOGGER.exception("Failed to unmount image from {dirpath}".format(dirpath=dirpath))
+            raise
 
 
 def _run_command(cmd, env=None):
