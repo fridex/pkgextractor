@@ -25,7 +25,7 @@ See shipped help for info about provided commands:
 .. code-block:: console
 
   $ docker run -v /var/run/docker.sock:/var/run/docker.sock pkgextract --help
-  $ # To analyze an image see:
-  $ docker run -v /var/run/docker.sock:/var/run/docker.sock pkgextract analyze -i my-image
+  $ # To analyze an image:
+  $ docker run --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker:/var/lib/docker pkgextract -vvvv analyze -i fedora:27
   ...
 
