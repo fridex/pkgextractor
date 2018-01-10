@@ -3,11 +3,9 @@
 
 import contextlib
 import json
-import logging
 import os
 import shlex
 import subprocess
-import sys
 import tempfile
 
 import daiquiri
@@ -15,35 +13,27 @@ import daiquiri
 _LOGGER = daiquiri.getLogger(__name__)
 
 _MERCATOR_BIN = os.getenv('MERCATOR_BIN', 'mercator')
-_MERCATOR_HANDLERS_YAML = os.getenv('MERCATOR_HANDLERS_YAML', '/usr/share/mercator')
+_MERCATOR_HANDLERS_YAML = os.getenv('MERCATOR_HANDLERS_YAML', '/usr/share/mercator/handlers.yml')
 _CONTAINER_DIFF_BIN = os.getenv('CONTAINER_DIFF_BIN', 'container-diff')
-
-
-def jsonify(dict_):
-    """Convert a dictionary to JSON, do it in a pretty way.
-
-    :param dict_: a dict that should be converted to a JSON
-    :type dict_: dict
-    :return: well-formatted JSON
-    :rtype: str
-    """
-    return json.dumps(dict_, sort_keys=True, separators=(',', ': '), indent=2)
 
 
 @contextlib.contextmanager
 def mount_image(image_name):
     """Mount a Docker image to a local filesystem."""
     dirpath = tempfile.mkdtemp()
+    _LOGGER.debug("Mounting image %r to %r", image_name, dirpath)
+    _run_command('atomic mount {image_name} {dirpath}'.format(
+        image_name=image_name,
+        dirpath=dirpath
+    ))
     try:
-        _LOGGER.debug("Mounting image %r to %r", image_name, dirpath)
-        _run_command('atomic mount {image_name} {dirpath}'.format(
-            image_name=image_name,
-            dirpath=dirpath
-        ))
         yield dirpath
     finally:
         _LOGGER.debug("Unmounting image %r from %r", image_name, dirpath)
-        _run_command('atomic umount {dirpath}'.format(dirpath=dirpath))
+        try:
+            _run_command('atomic umount {dirpath}'.format(dirpath=dirpath))
+        except Exception as exc:
+            _LOGGER.exception("Failed to unmount image from {dirpath}".format(dirpath=dirpath))
 
 
 def _run_command(cmd, env=None):

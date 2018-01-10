@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Implementation of CLI for pkgextract."""
 
+import json
 import logging
 import sys
 
@@ -8,6 +9,17 @@ import click
 import daiquiri
 
 from pkgextract import analyze
+
+
+def jsonify(dict_):
+    """Convert a dictionary to JSON, do it in a pretty way.
+
+    :param dict_: a dict that should be converted to a JSON
+    :type dict_: dict
+    :return: well-formatted JSON
+    :rtype: str
+    """
+    return json.dumps(dict_, sort_keys=True, separators=(',', ': '), indent=2)
 
 
 @click.group()

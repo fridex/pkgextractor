@@ -14,14 +14,20 @@ $(BINPATH):
 	mkdir -o $(BINPATH)
 
 
+# We need to build container-diff with gccgo as cgo fails with:
+#   user: Current not implemented on linux/amd64 
+#
+# See https://github.com/golang/go/issues/14625
+#
 .PHONY: container-diff
 container-diff: $(BINPATH)
 	[ -d $(CONTAINER_DIFF_PATH) ] \
 		|| git clone https://github.com/GoogleCloudPlatform/container-diff $(CONTAINER_DIFF_PATH)
 	cd $(CONTAINER_DIFF_PATH) &&\
-	  make &&\
+	  go get -compiler gccgo &&\
+	  go build -compiler gccgo -o container-diff &&\
 	  cd $(PWD)
-	cp $(CONTAINER_DIFF_PATH)/out/container-diff $(BINPATH)
+	cp $(CONTAINER_DIFF_PATH)/container-diff $(BINPATH)
 
 
 .PHONY: mercator-go
