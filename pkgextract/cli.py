@@ -42,3 +42,7 @@ def cli_analyze(image_name=None, output_file=None):
     output_file = output_file or sys.stdout
     result = analyze(image_name)
     output_file.write(jsonify(result))
+
+
+if __name__ == '__main__':
+    cli()
