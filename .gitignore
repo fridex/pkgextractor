@@ -2,3 +2,4 @@ bin/
 container-diff/
 mercator-go/
 
+__pycache__
